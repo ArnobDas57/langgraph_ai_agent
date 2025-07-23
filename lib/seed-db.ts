@@ -1,12 +1,34 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { MongoClient } from "mongodb";
 import { MongoDBAtlasVectorSearch } from "@langchain/mongodb";
 import { z } from "zod";
 
+if (!process.env.MONGODB_ATLAS_URI) {
+  throw new Error("MONGODB_ATLAS_URI is not defined in your .env file");
+}
+
+if (!process.env.OPENROUTER_API_KEY) {
+  throw new Error("OPENAI_API_KEY is not defined in .env file");
+}
+
 const client = new MongoClient(process.env.MONGODB_ATLAS_URI as string);
 
-const llm = new ChatOpenAI({ modelName: "gpt-4o-mini", temperature: 0.7 });
+const llm = new ChatOpenAI({
+  modelName: "openrouter/gpt-4o", // or any other OpenRouter-supported model
+  temperature: 0.7,
+  openAIApiKey: process.env.OPENROUTER_API_KEY,
+  configuration: {
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultHeaders: {
+      "HTTP-Referer": "http://localhost:3000", // or your deployed domain
+      "X-Title": "LangGraph Employee Seeder", // optional: app name
+    },
+  },
+});
 
 const EmployeeSchema = z.object({
   employee_id: z.string(),

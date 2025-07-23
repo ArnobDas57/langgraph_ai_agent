@@ -75,3 +75,70 @@ async function generateSyntheticData(): Promise<Employee[]> {
   const response = await llm.invoke(prompt);
   return parser.parse(response.content as string);
 }
+
+const createEmployeeSummary = async (employee: Employee): Promise<string> => {
+  return new Promise((resolve) => {
+    const jobDetails = `${employee.job_details.job_title} in ${employee.job_details.department}`;
+    const skills = employee.skills.join(", ");
+    const performanceReviews = employee.performance_reviews
+      .map(
+        (review) =>
+          `Rated ${review.rating} on ${review.review_date}: ${review.comments}`
+      )
+      .join(" ");
+
+    const basicInfo = `${employee.first_name} ${employee.last_name}, born on ${employee.date_of_birth}`;
+    const workLocation = `Works at ${employee.work_location.nearest_office}, Remote: ${employee.work_location.is_remote}`;
+    const notes = employee.notes;
+  });
+};
+
+const seedDatabase = async (): Promise<void> => {
+  try {
+    await client.connect();
+    await client.db("admin").command({ ping: 1 });
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
+
+    const db = client.db("hr_database");
+    const collection = db.collection("employees");
+
+    await collection.deleteMany({});
+
+    const syntheticData = await generateSyntheticData();
+
+    const recordsWithSummaries = await Promise.all(
+      syntheticData.map(async (record) => ({
+        pageContent: await createEmployeeSummary(record),
+        metadata: { ...record },
+      }))
+    );
+
+    for (const record of recordsWithSummaries) {
+      await MongoDBAtlasVectorSearch.fromDocuments(
+        [record],
+        new OpenAIEmbeddings(),
+        {
+          collection,
+          indexName: "vector_index",
+          textKey: "embedding_text",
+          embeddingKey: "embedding",
+        }
+      );
+
+      console.log(
+        "Successfully processed & saved record:",
+        record.metadata.employee_id
+      );
+    }
+
+    console.log("Database seeding completed");
+  } catch (error) {
+    console.error("Error seeding database:", error);
+  } finally {
+    await client.close();
+  }
+};
+
+seedDatabase().catch(console.error);

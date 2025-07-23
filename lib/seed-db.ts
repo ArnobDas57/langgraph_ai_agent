@@ -11,16 +11,16 @@ if (!process.env.MONGODB_ATLAS_URI) {
   throw new Error("MONGODB_ATLAS_URI is not defined in your .env file");
 }
 
-if (!process.env.OPENROUTER_API_KEY) {
-  throw new Error("OPENAI_API_KEY is not defined in .env file");
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error("OPENAI_API_KEY is not defined in your .env file");
 }
 
 const client = new MongoClient(process.env.MONGODB_ATLAS_URI as string);
 
 const llm = new ChatOpenAI({
-  modelName: "openrouter/gpt-4o", // or any other OpenRouter-supported model
+  modelName: "gpt-4o", // or any other OpenRouter-supported model
   temperature: 0.7,
-  openAIApiKey: process.env.OPENROUTER_API_KEY,
+  openAIApiKey: process.env.OPENAI_API_KEY,
   configuration: {
     baseURL: "https://openrouter.ai/api/v1",
     defaultHeaders: {

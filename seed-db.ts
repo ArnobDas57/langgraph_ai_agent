@@ -1,33 +1,15 @@
-import dotenv from "dotenv";
-dotenv.config();
-
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { MongoClient } from "mongodb";
 import { MongoDBAtlasVectorSearch } from "@langchain/mongodb";
 import { z } from "zod";
-
-if (!process.env.MONGODB_ATLAS_URI) {
-  throw new Error("MONGODB_ATLAS_URI is not defined in your .env file");
-}
-
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("OPENAI_API_KEY is not defined in your .env file");
-}
+import "dotenv/config";
 
 const client = new MongoClient(process.env.MONGODB_ATLAS_URI as string);
 
 const llm = new ChatOpenAI({
-  modelName: "gpt-4o", // or any other OpenRouter-supported model
+  modelName: "gpt-4o-mini",
   temperature: 0.7,
-  openAIApiKey: process.env.OPENAI_API_KEY,
-  configuration: {
-    baseURL: "https://openrouter.ai/api/v1",
-    defaultHeaders: {
-      "HTTP-Referer": "http://localhost:3000", // or your deployed domain
-      "X-Title": "LangGraph Employee Seeder", // optional: app name
-    },
-  },
 });
 
 const EmployeeSchema = z.object({
@@ -85,10 +67,7 @@ type Employee = z.infer<typeof EmployeeSchema>;
 const parser = StructuredOutputParser.fromZodSchema(z.array(EmployeeSchema));
 
 async function generateSyntheticData(): Promise<Employee[]> {
-  const prompt = `You are a helpful assistant that generates employee data. Generate 10 fictional employee records. 
-  Each record should include the following fields: employee_id, first_name, last_name, date_of_birth, address, 
-  contact_details, job_details, work_location, reporting_manager, skills, performance_reviews, benefits, emergency_contact, 
-  notes. Ensure variety in the data and realistic values.
+  const prompt = `You are a helpful assistant that generates employee data. Generate 10 fictional employee records. Each record should include the following fields: employee_id, first_name, last_name, date_of_birth, address, contact_details, job_details, work_location, reporting_manager, skills, performance_reviews, benefits, emergency_contact, notes. Ensure variety in the data and realistic values.
 
   ${parser.getFormatInstructions()}`;
 
@@ -98,7 +77,7 @@ async function generateSyntheticData(): Promise<Employee[]> {
   return parser.parse(response.content as string);
 }
 
-const createEmployeeSummary = async (employee: Employee): Promise<string> => {
+async function createEmployeeSummary(employee: Employee): Promise<string> {
   return new Promise((resolve) => {
     const jobDetails = `${employee.job_details.job_title} in ${employee.job_details.department}`;
     const skills = employee.skills.join(", ");
@@ -108,14 +87,17 @@ const createEmployeeSummary = async (employee: Employee): Promise<string> => {
           `Rated ${review.rating} on ${review.review_date}: ${review.comments}`
       )
       .join(" ");
-
     const basicInfo = `${employee.first_name} ${employee.last_name}, born on ${employee.date_of_birth}`;
     const workLocation = `Works at ${employee.work_location.nearest_office}, Remote: ${employee.work_location.is_remote}`;
     const notes = employee.notes;
-  });
-};
 
-const seedDatabase = async (): Promise<void> => {
+    const summary = `${basicInfo}. Job: ${jobDetails}. Skills: ${skills}. Reviews: ${performanceReviews}. Location: ${workLocation}. Notes: ${notes}`;
+
+    resolve(summary);
+  });
+}
+
+async function seedDatabase(): Promise<void> {
   try {
     await client.connect();
     await client.db("admin").command({ ping: 1 });
@@ -161,6 +143,6 @@ const seedDatabase = async (): Promise<void> => {
   } finally {
     await client.close();
   }
-};
+}
 
 seedDatabase().catch(console.error);
